@@ -1,31 +1,18 @@
-// api/analyze.js 最終穩定版
+// api/analyze.js (偵錯專用)
 export default async function handler(req, res) {
-    const { title } = req.body;
     const API_KEY = process.env.GEMINI_API_KEY;
-
-    // 嘗試這個最穩定的 ID，它在 v1 之下對收費帳戶完全開放
-    const MODEL_NAME = "gemini-1.5-flash"; 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
-
+    
     try {
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: `分析此網絡安全威脅對 BT 公司的影響：${title}` }] }]
-            })
-        });
-
+        // 請求 Google 列出所有妳這把 Key 權限內可用的模型
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
         const data = await response.json();
-
-        // 如果還是報錯，我們讓它顯示「可用模型列表」，這樣妳就能一眼看到正確的 ID
-        if (data.error) {
-            return res.status(400).json({ error: `API 報錯: ${data.error.message}` });
-        }
-
-        const aiText = data.candidates[0].content.parts[0].text;
-        res.status(200).json({ text: aiText });
+        
+        // 直接回傳模型清單給網頁
+        res.status(200).json({ 
+            message: "請從以下清單選擇一個支援 generateContent 的模型名稱",
+            available_models: data.models ? data.models.map(m => m.name) : "無可用模型"
+        });
     } catch (err) {
-        res.status(500).json({ error: "Server Error: " + err.message });
+        res.status(500).json({ error: err.message });
     }
 }
