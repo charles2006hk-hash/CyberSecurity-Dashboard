@@ -1,34 +1,50 @@
 // api/analyze.js
 export default async function handler(req, res) {
+    // 1. 設置標頭，允許跨域 (CORS)
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: '請使用 POST 請求' });
+    }
+
     const { title } = req.body;
     const API_KEY = process.env.GEMINI_API_KEY;
 
-    // 確保這裡的模型名稱是 gemini-3-flash
-    const MODEL_NAME = "gemini-3-flash"; 
+    // 2. 檢查關鍵環境變數
+    if (!API_KEY) {
+        return res.status(500).json({ error: '伺服器未設定 GEMINI_API_KEY，請在 Vercel Settings 檢查' });
+    }
 
+    // 3. 呼叫 Gemini (使用目前最穩定的 1.5-flash 標識符)
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`, {
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+        
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ 
-                    parts: [{ 
-                        text: `作為網絡安全專家，請針對此新聞標題進行簡短分析（50字內）："${title}"。請說明對大型電信公司的威脅點及建議監控方向。` 
-                    }] 
-                }]
+                contents: [{ parts: [{ text: `你是一位資深網絡安全分析師，請針對以下新聞標題提供簡短的威脅分析（50字內）："${title}"` }] }]
             })
         });
 
         const data = await response.json();
 
-        // 檢查 API 是否回傳錯誤訊息（例如 Key 沒設對）
         if (data.error) {
-            console.error("Gemini API Error:", data.error);
-            return res.status(500).json({ error: data.error.message });
+            // 如果 Google API 回報錯誤（例如 Key 無效）
+            return res.status(400).json({ error: `Google API 錯誤: ${data.error.message}` });
         }
 
-        res.status(200).json(data);
-    } catch (error) {
-        res.status(500).json({ error: '伺服器內部錯誤' });
+        return res.status(200).json(data);
+    } catch (err) {
+        // 捕捉程式碼崩潰原因
+        return res.status(500).json({ error: `伺服器內部崩潰: ${err.message}` });
     }
 }
