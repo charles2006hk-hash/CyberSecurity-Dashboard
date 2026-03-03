@@ -2,148 +2,188 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>BT SOC Intel Pro - Threat Matrix Dashboard</title>
+    <title>BT SOC Intelligence Suite</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @media print { .no-print { display: none; } body { background: white; } }
-        /* 威脅矩陣樣式 */
-        .matrix-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); gap: 2px; }
-        .matrix-cell { background: white; position: relative; min-height: 60px; }
-        .matrix-dot { position: absolute; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.3); transition: all 0.5s ease; cursor: pointer; }
-        /* 熱力圖顏色 */
-        .risk-5-5, .risk-5-4, .risk-4-5 { background-color: #fee2e2; } /* Critical */
-        .risk-5-3, .risk-4-4, .risk-3-5 { background-color: #ffedd5; } /* High */
-        .risk-1-1, .risk-1-2, .risk-2-1 { background-color: #dcfce7; } /* Low */
+        @media print { .no-print { display: none; } .print-area { display: block !important; } }
+        .matrix-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); gap: 1px; background: #e2e8f0; border: 1px solid #cbd5e1; }
+        .matrix-cell { background: white; position: relative; min-height: 50px; }
+        .matrix-dot { position: absolute; width: 10px; height: 10px; border-radius: 50%; transform: translate(-50%, -50%); border: 1px solid white; cursor: pointer; }
+        /* 熱力顏色 */
+        .risk-high { background-color: #fee2e2; } .risk-med { background-color: #ffedd5; } .risk-low { background-color: #f0fdf4; }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen">
-    <div class="max-w-7xl mx-auto py-8 px-4">
+<body class="bg-slate-50 min-h-screen">
+    <div class="max-w-7xl mx-auto py-6 px-4">
         <nav class="no-print mb-6 flex justify-between items-center bg-[#000031] p-4 rounded-xl text-white shadow-xl">
-            <h1 class="text-xl font-bold tracking-widest text-blue-400">BT SOC INTEL PRO</h1>
-            <div class="flex gap-2">
-                <button onclick="fetchNews()" class="bg-blue-600 px-4 py-2 rounded-lg text-sm font-bold">刷新情報 (Live Refresh)</button>
-                <button onclick="window.print()" class="bg-emerald-600 px-4 py-2 rounded-lg text-sm font-bold">PDF 報告導出</button>
+            <div class="flex items-center gap-4">
+                <h1 class="text-xl font-bold text-blue-400">BT SOC PRO</h1>
+                <div class="h-6 w-px bg-slate-700"></div>
+                <button onclick="switchView('live')" class="text-sm hover:text-blue-300 transition">即時監控</button>
+                <button onclick="switchView('library')" class="text-sm hover:text-blue-300 transition">情報歸類庫</button>
             </div>
+            <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-bold transition">PDF 輸出</button>
         </nav>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2 space-y-6" id="live-container">
-                <div class="text-center py-20 text-gray-400">正在同步全球情報...</div>
+        <div id="view-live" class="view-content grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 space-y-4" id="news-feed">
+                <button onclick="fetchNews()" class="no-print w-full py-3 bg-white border-2 border-dashed border-slate-300 rounded-xl text-slate-400 hover:border-blue-400 hover:text-blue-400 transition font-bold">🔄 刷新即時情報</button>
+                <div id="news-list" class="space-y-4"></div>
             </div>
+            
+            <div class="space-y-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-slate-800 mb-4 border-b pb-2 text-sm uppercase tracking-wider">Threat Matrix</h3>
+                    <div class="matrix-grid" id="live-matrix"></div>
+                    <div class="mt-4 flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+                        <span>Low Likelihood</span>
+                        <span>High Likelihood</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-            <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-                <div class="flex justify-between items-center mb-6 border-b pb-4">
-                    <h2 class="text-xl font-bold text-slate-800">Threat Matrix</h2>
-                    <span class="text-xs text-slate-400 uppercase">Impact vs Likelihood</span>
+        <div id="view-library" class="view-content hidden">
+            <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+                <div class="bg-slate-800 p-6 text-white flex justify-between items-center">
+                    <div>
+                        <h2 class="text-2xl font-bold">Intelligence Library</h2>
+                        <p class="text-xs text-slate-400">已歸類存檔之歷史威脅情報</p>
+                    </div>
+                    <select id="lib-filter" onchange="renderLibrary()" class="bg-slate-700 border-none text-sm rounded px-3 py-2">
+                        <option value="all">所有類別</option>
+                        <option value="Malware">惡意軟體</option>
+                        <option value="Identity">身份安全</option>
+                        <option value="Infra">基礎設施</option>
+                    </select>
                 </div>
-                
-                <div class="relative p-6 bg-gray-50 rounded-lg">
-                    <div class="absolute -left-6 top-1/2 -translate-y-1/2 -rotate-90 text-xs font-bold text-gray-500 tracking-wider">IMPACT (1-5)</div>
-                    <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-500 tracking-wider">LIKELIHOOD (1-5)</div>
-
-                    <div class="matrix-grid border border-gray-200" id="matrix-grid">
-                        </div>
-                </div>
-                
-                <div class="mt-8 text-xs text-slate-500 bg-slate-50 p-4 rounded italic">
-                    <strong>📌 SOC 操作說明:</strong>AI 會自動將分析結果定位於矩陣中。紅色區域（右上角）代表需立即採取行動的「危急 (Critical)」威脅。
-                </div>
+                <div id="library-list" class="divide-y divide-slate-100 p-6">
+                    </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- 初始化威脅矩陣網格 ---
-        function initMatrix() {
-            const grid = document.getElementById('matrix-grid');
+        let currentData = [];
+
+        // 初始化矩陣
+        function initMatrix(containerId) {
+            const grid = document.getElementById(containerId);
             grid.innerHTML = '';
-            // 生成 5x5 網格，從 (5,1) 到 (1,5)
             for (let y = 5; y >= 1; y--) {
                 for (let x = 1; x <= 5; x++) {
                     const cell = document.createElement('div');
-                    cell.className = `matrix-cell border border-gray-100 risk-${y}-${x}`;
-                    cell.id = `cell-${y}-${x}`;
+                    const riskClass = (x+y > 8) ? 'risk-high' : (x+y > 5) ? 'risk-med' : 'risk-low';
+                    cell.className = `matrix-cell ${riskClass}`;
+                    cell.id = `${containerId}-${y}-${x}`;
                     grid.appendChild(cell);
                 }
             }
         }
 
-        // --- 核心邏輯 ---
         async function fetchNews() {
-            const container = document.getElementById('live-container');
-            container.innerHTML = '<div class="text-center py-10 animate-pulse text-blue-600">正在從全球安全伺服器獲取即時情報...</div>';
-            initMatrix(); // 刷新時重置矩陣
+            initMatrix('live-matrix');
+            const list = document.getElementById('news-list');
+            list.innerHTML = '<div class="text-center py-10 text-slate-400 animate-pulse">正在掃描全球威脅...</div>';
             const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://www.bleepingcomputer.com/feed/')}`);
             const data = await res.json();
-            renderLive(data.items.slice(0, 5));
+            renderNews(data.items.slice(0, 5));
         }
 
-        function renderLive(items) {
-            const container = document.getElementById('live-container');
-            container.innerHTML = items.map((item, idx) => `
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200" id="card-${idx}">
-                    <div class="flex justify-between items-start mb-4 border-b pb-4">
-                        <h3 class="text-lg font-bold w-2/3 text-slate-800 leading-tight">${item.title}</h3>
-                        <div class="text-right text-xs text-gray-400 font-mono">${item.pubDate}</div>
+        function renderNews(items) {
+            const list = document.getElementById('news-list');
+            list.innerHTML = items.map((item, idx) => `
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative group">
+                    <div class="flex justify-between mb-3">
+                        <h4 class="font-bold text-slate-800 w-3/4">${item.title}</h4>
+                        <button onclick="archiveItem(${idx})" class="no-print opacity-0 group-hover:opacity-100 transition bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">📥 歸類存檔</button>
                     </div>
-                    <div id="ai-result-${idx}" class="space-y-4 animate-pulse text-gray-300">AI 分析中...</div>
+                    <div id="ai-box-${idx}" class="text-xs text-slate-400 italic">AI 分析中...</div>
                 </div>
             `).join('');
             items.forEach((item, idx) => callAI(item.title, idx));
         }
 
         async function callAI(title, idx) {
-            const target = document.getElementById(`ai-result-${idx}`);
+            const box = document.getElementById(`ai-box-${idx}`);
             try {
                 const res = await fetch('/api/analyze', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ title })
                 });
-                const data = await res.json();
+                const ai = await res.json();
+                currentData[idx] = { ...ai, title };
                 
-                // 在矩陣中打點
-                placeMatrixDot(data.impact, data.likelihood, idx);
+                // 更新矩陣
+                const cell = document.getElementById(`live-matrix-${ai.impact}-${ai.likelihood}`);
+                const dot = document.createElement('div');
+                dot.className = `matrix-dot ${ai.impact+ai.likelihood > 7 ? 'bg-red-600' : 'bg-orange-500'}`;
+                dot.style.left = '50%'; dot.style.top = '50%';
+                cell.appendChild(dot);
 
-                target.classList.remove('animate-pulse', 'text-gray-300');
-                target.innerHTML = `
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-4">
-                        <div class="border-l-4 border-blue-200 pl-3">
-                            <p class="font-bold text-blue-800">[中文分析]</p>${data.analysis_zh}
-                        </div>
-                        <div class="border-l-4 border-emerald-200 pl-3">
-                            <p class="font-bold text-emerald-800">[Suggested Action]</p>${data.action}
-                        </div>
+                box.innerHTML = `
+                    <div class="grid grid-cols-2 gap-4 mt-2 border-t pt-3 not-italic">
+                        <div class="text-slate-600 font-medium border-r pr-2"><span class="text-blue-600 font-bold block mb-1">ZH ANALYSIS</span>${ai.analysis_zh}</div>
+                        <div class="text-slate-500 italic"><span class="text-emerald-600 font-bold block mb-1">SUGGESTED ACTION</span>${ai.action}</div>
                     </div>
                 `;
-            } catch (e) { target.innerText = "分析失敗"; }
+            } catch (e) { box.innerText = "分析失敗"; }
         }
 
-        // --- 威脅矩陣打點邏輯 ---
-        function placeMatrixDot(impact, likelihood, idx) {
-            // 確保數值在 1-5 之間
-            const y = Math.max(1, Math.min(5, impact));
-            const x = Math.max(1, Math.min(5, likelihood));
-            const cell = document.getElementById(`cell-${y}-${x}`);
-            
-            // 計算點的顏色 (與風險圖表邏輯一致)
-            const dotColor = (y + x) > 8 ? 'bg-red-600' : (y + x) > 5 ? 'bg-orange-500' : 'bg-green-600';
+        // --- 歸類庫邏輯 ---
+        function archiveItem(idx) {
+            const item = currentData[idx];
+            if(!item) return alert("請等待 AI 分析完成");
+            const note = prompt("請輸入此威脅的調查備註 (Note):", "確認為電信基礎設施相關漏洞");
+            const archive = JSON.parse(localStorage.getItem('bt_lib') || '[]');
+            archive.push({ ...item, note, date: new Date().toLocaleString() });
+            localStorage.setItem('bt_lib', JSON.stringify(archive));
+            alert("已成功歸類至情報庫！");
+        }
 
-            const dot = document.createElement('div');
-            dot.className = `matrix-dot ${dotColor}`;
-            // 隨機一點偏移量，防止點完全重疊
-            dot.style.top = `${Math.random() * 60 + 20}%`; 
-            dot.style.left = `${Math.random() * 60 + 20}%`;
-            dot.title = `Threat #${idx+1} (Impact: ${y}, Likelihood: ${x})`;
-            
-            // 點擊點，高亮對應的新聞卡片
-            dot.onclick = () => {
-                document.querySelectorAll('.report-card').forEach(c => c.classList.remove('border-2', 'border-blue-500'));
-                document.getElementById(`card-${idx}`).classList.add('border-2', 'border-blue-500');
-                document.getElementById(`card-${idx}`).scrollIntoView({ behavior: 'smooth' });
-            };
+        function switchView(view) {
+            document.querySelectorAll('.view-content').forEach(v => v.classList.add('hidden'));
+            document.getElementById(`view-${view}`).classList.remove('hidden');
+            if(view === 'library') renderLibrary();
+        }
 
-            cell.appendChild(dot);
+        function renderLibrary() {
+            const list = document.getElementById('library-list');
+            const filter = document.getElementById('lib-filter').value;
+            let archive = JSON.parse(localStorage.getItem('bt_lib') || '[]');
+            
+            if(filter !== 'all') archive = archive.filter(i => i.category.includes(filter));
+            
+            if(archive.length === 0) {
+                list.innerHTML = '<p class="text-center py-10 text-slate-400">目前沒有存檔情報。</p>';
+                return;
+            }
+
+            list.innerHTML = archive.map((item, idx) => `
+                <div class="py-6 group">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-black text-slate-800 uppercase tracking-tight">${item.title}</h3>
+                        <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded font-mono">${item.date}</span>
+                    </div>
+                    <div class="flex gap-2 mb-4">
+                        <span class="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold uppercase">${item.category}</span>
+                        <span class="text-[9px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">Impact: ${item.impact}/5</span>
+                    </div>
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 text-sm text-slate-700">
+                        <strong>📌 調查備註:</strong> ${item.note}
+                    </div>
+                    <div class="text-xs text-slate-500 leading-relaxed">${item.analysis_en}</div>
+                    <button onclick="deleteLib(${idx})" class="no-print mt-4 text-[10px] text-red-400 hover:underline">刪除記錄</button>
+                </div>
+            `).join('');
+        }
+
+        function deleteLib(idx) {
+            let archive = JSON.parse(localStorage.getItem('bt_lib') || '[]');
+            archive.splice(idx, 1);
+            localStorage.setItem('bt_lib', JSON.stringify(archive));
+            renderLibrary();
         }
 
         window.onload = fetchNews;
