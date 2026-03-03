@@ -2,106 +2,131 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>BT SOC Intelligence Archive</title>
+    <title>BT SOC Intel Pro - Archive & Risk Radar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @media print { .no-print { display: none; } body { background: white; } }
-        .category-tag { font-size: 0.7rem; padding: 2px 8px; border-radius: 99px; font-weight: bold; text-transform: uppercase; }
-        .tag-malware { background: #fee2e2; color: #991b1b; }
-        .tag-identity { background: #fef9c3; color: #854d0e; }
-        .tag-infrastructure { background: #dcfce7; color: #166534; }
+        @media print { .no-print { display: none; } .print-only { display: block !important; } }
+        .risk-bar { transition: width 1s ease-in-out; }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen p-4 md:p-8">
-    <div class="max-w-5xl mx-auto">
-        <div class="no-print bg-white p-6 rounded-t-xl shadow-sm border-b flex flex-wrap gap-4 items-center justify-between">
-            <div class="flex items-center gap-4">
-                <h1 class="text-xl font-bold text-slate-800">BT Intelligence Archive</h1>
-                <select id="filter-type" class="border rounded px-3 py-1 text-sm bg-gray-50">
-                    <option value="all">所有即時情報</option>
-                    <option value="saved">已收藏歸類 (Saved)</option>
-                </select>
+<body class="bg-gray-100 min-h-screen">
+    <div class="max-w-6xl mx-auto py-8 px-4">
+        <nav class="no-print mb-6 flex justify-between items-center bg-[#000031] p-4 rounded-lg text-white shadow-lg">
+            <h1 class="text-xl font-bold tracking-widest text-blue-400">BT SOC INTEL PRO</h1>
+            <div class="flex gap-4 text-sm font-medium">
+                <button onclick="toggleView('live')" class="hover:text-blue-300">即時情報 (Live)</button>
+                <button onclick="toggleView('archive')" class="hover:text-blue-300">情報歸類庫 (Library)</button>
+                <button onclick="window.print()" class="bg-blue-600 px-3 py-1 rounded">PDF 報告輸出</button>
             </div>
-            <div class="flex gap-2">
-                <button onclick="fetchNews()" class="bg-slate-800 text-white px-4 py-2 rounded text-sm font-medium hover:bg-slate-700">刷新情報</button>
-                <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-500">導出 PDF</button>
-            </div>
+        </nav>
+
+        <div id="live-view" class="view-section space-y-6">
+            <div id="live-container" class="grid gap-6"></div>
         </div>
 
-        <div id="main-container" class="bg-white p-8 shadow-sm rounded-b-xl space-y-8">
-            <div id="status-msg" class="text-center text-gray-400 py-10">正在初始化系統...</div>
+        <div id="archive-view" class="view-section hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-md border-t-4 border-blue-600">
+                <h2 class="text-2xl font-bold mb-4 text-slate-800">Intelligence Library</h2>
+                <div id="archive-list" class="divide-y space-y-6"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        // 1. 初始化與新聞抓取
-        async function fetchNews() {
-            const container = document.getElementById('main-container');
-            const status = document.getElementById('status-msg');
-            container.innerHTML = '<div class="text-center py-10 animate-pulse text-blue-600">正在獲取全球安全動態...</div>';
+        // --- 核心邏輯 ---
+        let currentNews = [];
 
-            try {
-                const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://www.bleepingcomputer.com/feed/')}`);
-                const data = await res.json();
-                renderNews(data.items.slice(0, 6));
-            } catch (e) { container.innerHTML = "數據加載失敗，請檢查網路。"; }
+        async function fetchNews() {
+            const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://www.bleepingcomputer.com/feed/')}`);
+            const data = await res.json();
+            renderLive(data.items.slice(0, 5));
         }
 
-        // 2. 渲染新聞與 AI 分析框架
-        function renderNews(items) {
-            const container = document.getElementById('main-container');
+        function renderLive(items) {
+            const container = document.getElementById('live-container');
             container.innerHTML = items.map((item, idx) => `
-                <div class="report-card border-b pb-8 last:border-0" id="card-${idx}">
-                    <div class="flex justify-between items-start mb-2">
-                        <h2 class="text-xl font-extrabold text-slate-800 hover:text-blue-600 cursor-pointer" id="title-${idx}">${item.title}</h2>
-                        <div class="no-print flex gap-2">
-                            <button onclick="saveArchive(${idx}, 'malware')" class="text-[10px] border px-2 py-1 rounded hover:bg-red-50">📂 歸類:惡意軟體</button>
-                            <button onclick="saveArchive(${idx}, 'identity')" class="text-[10px] border px-2 py-1 rounded hover:bg-yellow-50">📂 歸類:身份認證</button>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-lg font-bold w-2/3">${item.title}</h3>
+                        <div class="text-right">
+                            <span class="text-xs text-gray-400 block mb-1">${item.pubDate}</span>
+                            <button onclick="saveToArchive(${idx})" class="no-print text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1 rounded">📥 歸類存檔</button>
                         </div>
                     </div>
-                    <p class="text-gray-500 text-sm mb-4">${item.pubDate}</p>
                     
-                    <div class="bg-slate-50 p-5 rounded-lg border-l-4 border-blue-500" id="ai-container-${idx}">
-                        <div class="text-xs font-bold text-blue-800 mb-2 flex items-center gap-2">
-                            <span>GEMINI 3 PRO ANALYSIS (Bilingual)</span>
-                            <span class="loading-dots animate-ping h-1.5 w-1.5 rounded-full bg-blue-400"></span>
-                        </div>
-                        <div class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed" id="ai-text-${idx}">正在生成中英雙語分析報告...</div>
-                    </div>
+                    <div id="ai-result-${idx}" class="space-y-4 animate-pulse text-gray-300">分析中...</div>
                 </div>
             `).join('');
-
-            // 觸發 AI 分析
             items.forEach((item, idx) => callAI(item.title, idx));
         }
 
-        // 3. 呼叫後端 API (中英雙語)
         async function callAI(title, idx) {
-            const textField = document.getElementById(`ai-text-${idx}`);
+            const target = document.getElementById(`ai-result-${idx}`);
             try {
-                const response = await fetch('/api/analyze', {
+                const res = await fetch('/api/analyze', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: title })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ title })
                 });
-                const data = await response.json();
-                textField.innerText = data.text || data.error;
-                document.querySelector(`#ai-container-${idx} .loading-dots`).remove();
-            } catch (e) { textField.innerText = "分析請求失敗。"; }
+                const data = await res.json();
+                currentNews[idx] = data; // 暫存分析結果
+
+                // 計算風險係數顏色
+                const color = data.risk_score > 7 ? 'bg-red-500' : data.risk_score > 4 ? 'bg-orange-400' : 'bg-green-500';
+
+                target.classList.remove('animate-pulse', 'text-gray-300');
+                target.innerHTML = `
+                    <div class="flex items-center gap-4 bg-gray-50 p-3 rounded-lg">
+                        <span class="text-xs font-bold text-gray-500 uppercase">Risk Factor:</span>
+                        <div class="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                            <div class="risk-bar h-full ${color}" style="width: ${data.risk_score * 10}%"></div>
+                        </div>
+                        <span class="text-sm font-black text-slate-700">${data.risk_score}/10</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mt-4">
+                        <div class="border-l-2 border-blue-200 pl-3">
+                            <p class="font-bold text-blue-800">[EN]</p>${data.analysis_en}
+                        </div>
+                        <div class="border-l-2 border-blue-200 pl-3">
+                            <p class="font-bold text-blue-800">[ZH]</p>${data.analysis_zh}
+                        </div>
+                    </div>
+                `;
+            } catch (e) { target.innerText = "分析失敗"; }
         }
 
-        // 4. 資訊歸類與儲存 (LocalStorage)
-        function saveArchive(idx, cat) {
-            const archiveData = {
-                title: document.getElementById(`title-${idx}`).innerText,
-                content: document.getElementById(`ai-text-${idx}`).innerText,
-                category: cat,
-                time: new Date().toLocaleString()
-            };
-            let current = JSON.parse(localStorage.getItem('bt_soc_archive') || '[]');
-            current.push(archiveData);
-            localStorage.setItem('bt_soc_archive', JSON.stringify(current));
-            alert('已成功存檔並分類！');
+        // --- 歸類庫功能 ---
+        function saveToArchive(idx) {
+            let archive = JSON.parse(localStorage.getItem('bt_archive') || '[]');
+            const note = prompt("請輸入備註 (Optional Note):");
+            const data = { ...currentNews[idx], title: document.querySelectorAll('h3')[idx].innerText, note: note || "無", saved_at: new Date().toLocaleString() };
+            archive.push(data);
+            localStorage.setItem('bt_archive', JSON.stringify(archive));
+            alert('已歸類至 Library');
+        }
+
+        function toggleView(view) {
+            document.querySelectorAll('.view-section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(`${view}-view`).classList.remove('hidden');
+            if(view === 'archive') renderArchive();
+        }
+
+        function renderArchive() {
+            const list = document.getElementById('archive-list');
+            const archive = JSON.parse(localStorage.getItem('bt_archive') || '[]');
+            list.innerHTML = archive.map(item => `
+                <div class="py-6 first:pt-0">
+                    <div class="flex justify-between mb-2">
+                        <h4 class="font-black text-slate-800 uppercase tracking-tight">${item.title}</h4>
+                        <span class="text-[10px] bg-slate-100 px-2 py-1 rounded font-mono">${item.saved_at}</span>
+                    </div>
+                    <div class="text-xs text-blue-600 font-bold mb-3 uppercase">Category: ${item.category}</div>
+                    <div class="text-sm text-slate-600 mb-4 bg-yellow-50 p-3 rounded border-l-4 border-yellow-400">
+                        <strong>📌 備註 (Note):</strong> ${item.note}
+                    </div>
+                    <p class="text-xs text-slate-400 leading-relaxed">${item.analysis_en}</p>
+                </div>
+            `).join('');
         }
 
         window.onload = fetchNews;
