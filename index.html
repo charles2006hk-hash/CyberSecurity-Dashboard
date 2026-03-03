@@ -5,89 +5,111 @@
     <title>BT SOC PRO - Executive Intelligence Suite</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 專業 PDF 列印樣式優化 */
+        /* 1. 強制列印出所有背景顏色與圖片 (解決圖表空白問題) */
+        * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* 2. A4 專業 PDF 列印樣式 */
         @media print { 
-            body { background: white !important; font-family: Arial, sans-serif; color: black; }
+            @page { size: A4 portrait; margin: 1.5cm; } /* 設定為標準 A4 尺寸與邊距 */
+            body { background: white !important; font-family: 'Helvetica', 'Arial', sans-serif; color: #1e293b; }
+            
             .no-print { display: none !important; } 
             .print-only { display: block !important; }
-            .news-card { page-break-inside: avoid; border: 1px solid #cbd5e1 !important; margin-bottom: 1.5rem; box-shadow: none !important; }
-            .matrix-grid { border: 2px solid black !important; background: white !important; }
-            .world-map-container { filter: grayscale(100%); border: 1px solid #ccc; page-break-inside: avoid; }
-            @page { margin: 1.5cm; }
+            
+            /* 讓新聞卡片絕對不會在換頁時被切成兩半 */
+            .news-card { 
+                page-break-inside: avoid !important; 
+                border: 1px solid #cbd5e1 !important; 
+                margin-bottom: 1.5rem !important; 
+                box-shadow: none !important; 
+            }
+            
+            /* 針對列印優化矩陣與地圖的邊框 */
+            .matrix-grid { border: 2px solid #334155 !important; }
+            .world-map-container { filter: grayscale(80%); border: 2px solid #334155 !important; }
+            
+            /* 列印時的版面重組：強制讓兩個圖表在第一頁頂部並排顯示 */
+            #print-charts-row { display: flex !important; flex-direction: row !important; gap: 1.5rem !important; margin-bottom: 2rem !important; page-break-inside: avoid; }
+            #print-charts-row > div { width: 50% !important; }
         }
         
         /* 威脅矩陣樣式 */
         .matrix-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(5, 1fr); gap: 1px; background: #e2e8f0; border: 1px solid #cbd5e1; aspect-ratio: 1; }
         .matrix-cell { background: white; position: relative; }
-        .matrix-dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%, -50%); border: 2px solid white; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); z-index: 10; }
+        .matrix-dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; transform: translate(-50%, -50%); border: 2px solid white; cursor: pointer; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.5); z-index: 10; }
         .matrix-dot:hover { transform: translate(-50%, -50%) scale(1.5); }
         .risk-high { background-color: #fee2e2; } .risk-med { background-color: #ffedd5; } .risk-low { background-color: #f0fdf4; }
         
         /* 地圖雷達樣式 */
-        .radar-dot { position: absolute; width: 8px; height: 8px; background-color: red; border-radius: 50%; transform: translate(-50%, -50%); z-index: 10; }
-        .radar-ping { position: absolute; width: 24px; height: 24px; border: 2px solid red; border-radius: 50%; transform: translate(-50%, -50%); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite; }
-        @keyframes ping { 75%, 100% { transform: translate(-50%, -50%) scale(2); opacity: 0; } }
+        .radar-dot { position: absolute; width: 8px; height: 8px; background-color: #ef4444; border-radius: 50%; transform: translate(-50%, -50%); z-index: 10; box-shadow: 0 0 4px #000; }
+        .radar-ping { position: absolute; width: 24px; height: 24px; border: 2px solid #ef4444; border-radius: 50%; transform: translate(-50%, -50%); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite; }
+        @keyframes ping { 75%, 100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; } }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen pb-10">
+<body class="bg-slate-50 min-h-screen pb-10">
     
-    <div class="hidden print-only mb-8 border-b-4 border-[#000031] pb-4">
-        <h1 class="text-3xl font-black text-[#000031]">BT GLOBAL CYBER SECURITY</h1>
-        <h2 class="text-xl text-slate-600">Daily Threat Intelligence Briefing</h2>
-        <div class="mt-2 text-sm font-bold text-slate-500" id="print-date"></div>
+    <div class="hidden print-only mb-6 border-b-4 border-[#000031] pb-4 pt-4">
+        <div class="flex justify-between items-end">
+            <div>
+                <h1 class="text-3xl font-black text-[#000031] tracking-tighter">BT GLOBAL SECURITY</h1>
+                <h2 class="text-xl text-slate-500 font-bold mt-1">Daily Threat Intelligence Briefing (TIB)</h2>
+            </div>
+            <div class="text-right">
+                <div class="text-sm font-bold text-red-600 bg-red-50 px-3 py-1 border border-red-200 uppercase tracking-widest inline-block mb-1">Confidential (Internal)</div>
+                <div class="text-xs font-bold text-slate-500" id="print-date"></div>
+            </div>
+        </div>
     </div>
 
     <div class="max-w-7xl mx-auto pt-6 px-4">
-        <nav class="no-print mb-6 flex justify-between items-center bg-[#000031] p-4 rounded-xl text-white shadow-xl">
+        <nav class="no-print mb-8 flex justify-between items-center bg-[#000031] p-4 rounded-xl text-white shadow-xl">
             <div class="flex items-center gap-4">
                 <h1 class="text-xl font-bold text-blue-400 tracking-wider">BT SOC PRO</h1>
                 <div class="h-6 w-px bg-slate-700"></div>
-                <button onclick="switchView('live')" class="text-sm font-bold hover:text-blue-300 transition">即時戰情室</button>
-                <button onclick="switchView('library')" class="text-sm hover:text-blue-300 transition">情報歸類庫</button>
+                <span class="text-sm font-bold text-white tracking-widest uppercase">Live Dashboard</span>
             </div>
-            <div class="flex gap-2">
-                <button onclick="fetchNews()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-bold transition">🔄 刷新情報</button>
-                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-bold transition">📄 導出正式報告</button>
+            <div class="flex gap-3">
+                <button onclick="fetchNews()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2"><span>🔄</span> 刷新情報</button>
+                <button onclick="window.print()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 shadow-lg shadow-emerald-900/20"><span>📄</span> 導出 A4 報告</button>
             </div>
         </nav>
 
-        <div id="view-live" class="view-content grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div id="view-live" class="flex flex-col lg:flex-row gap-8">
             
-            <div class="lg:col-span-2 space-y-6" id="news-list">
-                <div class="text-center py-20 text-slate-400 animate-pulse">正在掃描全球威脅...</div>
+            <div class="w-full lg:w-2/3 order-2 lg:order-1 space-y-6" id="news-list">
+                <div class="text-center py-20 text-slate-400 animate-pulse font-bold tracking-widest">INITIALIZING SECURE CONNECTION...</div>
             </div>
             
-            <div class="space-y-6">
+            <div class="w-full lg:w-1/3 order-1 lg:order-2 flex flex-col gap-6" id="print-charts-row">
                 
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
-                    <h3 class="font-black text-slate-800 mb-4 text-sm uppercase tracking-widest flex justify-between items-center">
+                <div class="bg-white p-5 rounded-xl shadow-lg border border-slate-200 flex-1">
+                    <h3 class="font-black text-slate-800 mb-3 text-sm uppercase tracking-widest border-b pb-2 flex justify-between items-center">
                         <span>Threat Matrix</span>
                         <span class="text-[10px] text-slate-400 font-normal">Impact vs Likelihood</span>
                     </h3>
-                    <div class="matrix-grid" id="live-matrix"></div>
-                    <div class="mt-2 text-center text-[10px] text-slate-400 italic">點擊矩陣上的圓點可查看對應威脅</div>
-                </div>
-
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
-                    <h3 class="font-black text-slate-800 mb-4 text-sm uppercase tracking-widest flex justify-between items-center">
-                        <span>Origin Radar</span>
-                        <span class="text-[10px] text-slate-400 font-normal">AI Geo-Estimation</span>
-                    </h3>
-                    <div class="world-map-container relative w-full aspect-[2/1] bg-slate-50 rounded border border-slate-200 overflow-hidden" 
-                         style="background-image: url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg'); background-size: cover; background-position: center;">
-                        <div id="map-radars"></div>
+                    <div class="matrix-grid w-full" id="live-matrix"></div>
+                    <div class="mt-3 text-center text-[9px] text-slate-500 font-bold bg-slate-50 p-1.5 rounded uppercase tracking-wider">
+                        Red: Critical | Orange: High | Green: Low
                     </div>
                 </div>
 
-            </div>
-        </div>
-
-        <div id="view-library" class="view-content hidden">
-            <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-                <div class="bg-slate-800 p-6 text-white flex justify-between items-center">
-                    <h2 class="text-2xl font-bold">Intelligence Library</h2>
+                <div class="bg-white p-5 rounded-xl shadow-lg border border-slate-200 flex-1">
+                    <h3 class="font-black text-slate-800 mb-3 text-sm uppercase tracking-widest border-b pb-2 flex justify-between items-center">
+                        <span>Origin Radar</span>
+                        <span class="text-[10px] text-slate-400 font-normal">AI Geo-Targeting</span>
+                    </h3>
+                    <div class="world-map-container relative w-full aspect-[2/1] bg-blue-50/50 rounded overflow-hidden" 
+                         style="background-image: url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+                        <div id="map-radars"></div>
+                    </div>
+                    <div class="mt-3 text-center text-[9px] text-slate-500 font-bold bg-slate-50 p-1.5 rounded uppercase tracking-wider">
+                        Estimated Threat Origin / Targets
+                    </div>
                 </div>
-                <div id="library-list" class="divide-y divide-slate-100 p-6"></div>
+
             </div>
         </div>
     </div>
@@ -95,7 +117,9 @@
     <script>
         let currentData = [];
 
-        document.getElementById('print-date').innerText = "Report Date: " + new Date().toLocaleDateString();
+        // 設定 PDF 列印時間
+        const now = new Date();
+        document.getElementById('print-date').innerText = "Generated: " + now.toLocaleString('en-US', { hour12: false }) + " (UTC+8)";
 
         // --- 初始化矩陣 ---
         function initMatrix() {
@@ -104,7 +128,7 @@
             for (let y = 5; y >= 1; y--) {
                 for (let x = 1; x <= 5; x++) {
                     const cell = document.createElement('div');
-                    const riskClass = (x+y > 8) ? 'risk-high' : (x+y > 5) ? 'risk-med' : 'risk-low';
+                    const riskClass = (x+y > 7) ? 'risk-high' : (x+y > 5) ? 'risk-med' : 'risk-low';
                     cell.className = `matrix-cell ${riskClass}`;
                     cell.id = `matrix-${y}-${x}`;
                     grid.appendChild(cell);
@@ -116,26 +140,35 @@
         async function fetchNews() {
             initMatrix();
             const list = document.getElementById('news-list');
-            list.innerHTML = '<div class="text-center py-10 text-slate-400 animate-pulse font-bold tracking-widest">INITIALIZING GLOBAL SCAN...</div>';
+            list.innerHTML = '<div class="text-center py-20 text-blue-500 animate-pulse font-black tracking-widest text-lg">SCANNING GLOBAL THREAT FEEDS...</div>';
             try {
+                // 從權威來源獲取 RSS
                 const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://www.bleepingcomputer.com/feed/')}`);
                 const data = await res.json();
                 renderNews(data.items.slice(0, 5));
-            } catch(e) { list.innerHTML = "獲取失敗"; }
+            } catch(e) { list.innerHTML = "獲取情報失敗，請檢查網路連線。"; }
         }
 
         function renderNews(items) {
             const list = document.getElementById('news-list');
             list.innerHTML = items.map((item, idx) => `
-                <div class="news-card bg-white p-6 rounded-xl border border-slate-200 shadow-sm transition duration-300" id="card-${idx}">
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <h4 class="font-bold text-slate-800 text-lg leading-tight">${item.title}</h4>
-                            <p class="text-[11px] text-slate-400 font-mono mt-1">Detected: ${item.pubDate}</p>
+                <div class="news-card bg-white p-6 rounded-xl border border-slate-200 shadow-sm transition duration-300 relative overflow-hidden" id="card-${idx}">
+                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-slate-200" id="card-color-${idx}"></div>
+                    
+                    <div class="pl-3">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h4 class="font-bold text-slate-800 text-lg leading-tight mb-1">${item.title}</h4>
+                                <div class="flex items-center gap-3 text-[11px] font-mono text-slate-400">
+                                    <span class="bg-slate-100 px-2 py-0.5 rounded">ID: THRT-${Math.floor(Math.random()*90000)+10000}</span>
+                                    <span>Detected: ${item.pubDate}</span>
+                                </div>
+                            </div>
                         </div>
-                        <button onclick="archiveItem(${idx})" class="no-print bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-md text-xs font-bold whitespace-nowrap ml-4">📥 歸類</button>
+                        <div id="ai-box-${idx}" class="mt-4 pt-4 border-t border-slate-100 text-sm text-slate-400 italic">
+                            <span class="animate-pulse">Gemini 3 Pro Engine is analyzing threat vectors...</span>
+                        </div>
                     </div>
-                    <div id="ai-box-${idx}" class="text-sm text-slate-400 italic">Gemini 3 Pro 分析中...</div>
                 </div>
             `).join('');
             
@@ -151,24 +184,31 @@
                     body: JSON.stringify({ title })
                 });
                 const ai = await res.json();
-                currentData[idx] = { ...ai, title };
                 
-                // 1. 在矩陣打點並綁定點擊事件
+                // 1. 打點與連動
                 plotMatrixDot(ai.impact, ai.likelihood, idx);
-                
-                // 2. 在地圖打點
                 if(ai.geo_lat && ai.geo_lng) {
-                    plotMapRadar(ai.geo_lat, ai.geo_lng, ai.impact + ai.likelihood > 7 ? 'red' : 'orange');
+                    plotMapRadar(ai.geo_lat, ai.geo_lng, ai.impact + ai.likelihood > 7 ? '#ef4444' : '#f97316');
                 }
 
-                // 渲染文本
+                // 2. 更新卡片顏色邊條 (根據風險)
+                const isHighRisk = (ai.impact + ai.likelihood > 7);
+                document.getElementById(`card-color-${idx}`).className = `absolute left-0 top-0 bottom-0 w-1.5 ${isHighRisk ? 'bg-red-500' : 'bg-orange-400'}`;
+
+                // 3. 渲染 A4 友善的文本排版
                 box.innerHTML = `
-                    <div class="mt-4 border-t border-slate-100 pt-4 grid grid-cols-1 md:grid-cols-2 gap-6 not-italic">
-                        <div class="text-slate-700 text-sm leading-relaxed"><span class="text-blue-600 font-black block mb-1 text-xs uppercase">ZH Analysis</span>${ai.analysis_zh}</div>
-                        <div class="text-slate-700 text-sm leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100"><span class="text-emerald-600 font-black block mb-1 text-xs uppercase">SOC Action</span>${ai.action}</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 not-italic">
+                        <div class="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                            <span class="text-blue-800 font-black block mb-2 text-[10px] uppercase tracking-widest">Executive Analysis (ZH)</span>
+                            <p class="text-slate-700 text-sm leading-relaxed">${ai.analysis_zh}</p>
+                        </div>
+                        <div class="bg-emerald-50/50 p-4 rounded-lg border border-emerald-100">
+                            <span class="text-emerald-800 font-black block mb-2 text-[10px] uppercase tracking-widest">Suggested SOC Action</span>
+                            <p class="text-slate-700 text-sm leading-relaxed">${ai.action}</p>
+                        </div>
                     </div>
                 `;
-            } catch (e) { box.innerText = "分析失敗"; }
+            } catch (e) { box.innerText = "Analysis Interrupted."; }
         }
 
         // --- 視覺化邏輯 ---
@@ -177,32 +217,29 @@
             const x = Math.max(1, Math.min(5, likelihood));
             const cell = document.getElementById(`matrix-${y}-${x}`);
             
-            const dotColor = (y+x > 7) ? 'bg-red-600' : 'bg-orange-500';
+            const isHighRisk = (y+x > 7);
+            const dotColor = isHighRisk ? 'bg-red-600' : 'bg-orange-500';
             const dot = document.createElement('div');
             dot.className = `matrix-dot ${dotColor}`;
-            dot.style.left = `${Math.random() * 40 + 30}%`; 
-            dot.style.top = `${Math.random() * 40 + 30}%`;
+            
+            // 隨機偏移防止重疊
+            dot.style.left = `${Math.random() * 50 + 25}%`; 
+            dot.style.top = `${Math.random() * 50 + 25}%`;
             dot.title = `點擊查看威脅 #${idx+1}`;
 
-            // 實現點擊聯動左側卡片
+            // 螢幕互動：點擊紅點跳轉到卡片
             dot.onclick = () => {
-                // 移除所有高亮
-                document.querySelectorAll('.news-card').forEach(c => {
-                    c.classList.remove('ring-4', 'ring-blue-400', 'border-blue-400');
-                });
-                // 高亮目標卡片
+                document.querySelectorAll('.news-card').forEach(c => c.classList.remove('ring-4', 'ring-blue-400', 'shadow-xl'));
                 const targetCard = document.getElementById(`card-${idx}`);
-                targetCard.classList.add('ring-4', 'ring-blue-400', 'border-blue-400');
-                // 平滑滾動至該卡片
+                targetCard.classList.add('ring-4', 'ring-blue-400', 'shadow-xl');
                 targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
             };
 
             if(cell) cell.appendChild(dot);
         }
 
-        function plotMapRadar(lat, lng, color) {
+        function plotMapRadar(lat, lng, colorHex) {
             const container = document.getElementById('map-radars');
-            // 將經緯度轉換為 CSS 百分比 (經度 -180~180 -> 0~100%, 緯度 90~-90 -> 0~100%)
             const topPos = ((90 - lat) / 180) * 100;
             const leftPos = ((180 + lng) / 360) * 100;
 
@@ -212,16 +249,10 @@
             wrap.style.left = `${leftPos}%`;
 
             wrap.innerHTML = `
-                <div class="radar-ping" style="border-color: ${color}"></div>
-                <div class="radar-dot" style="background-color: ${color}"></div>
+                <div class="radar-ping" style="border-color: ${colorHex}"></div>
+                <div class="radar-dot" style="background-color: ${colorHex}"></div>
             `;
             container.appendChild(wrap);
-        }
-
-        // --- 視圖切換 ---
-        function switchView(view) {
-            document.querySelectorAll('.view-content').forEach(v => v.classList.add('hidden'));
-            document.getElementById(`view-${view}`).classList.remove('hidden');
         }
 
         window.onload = fetchNews;
