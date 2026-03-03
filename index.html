@@ -2,104 +2,109 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>BT Cyber Intelligence Report - Powered by Gemini 3</title>
+    <title>BT SOC Intelligence Archive</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @media print { .no-print { display: none; } body { background: white; } .report-card { break-inside: avoid; border: 1px solid #eee; margin-bottom: 20px; } }
-        .typing { border-right: 2px solid #3b82f6; animation: blink 0.75s step-end infinite; }
-        @keyframes blink { from, to { border-color: transparent } 50% { border-color: #3b82f6 } }
+        @media print { .no-print { display: none; } body { background: white; } }
+        .category-tag { font-size: 0.7rem; padding: 2px 8px; border-radius: 99px; font-weight: bold; text-transform: uppercase; }
+        .tag-malware { background: #fee2e2; color: #991b1b; }
+        .tag-identity { background: #fef9c3; color: #854d0e; }
+        .tag-infrastructure { background: #dcfce7; color: #166534; }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen p-4 md:p-10">
-    <div class="max-w-4xl mx-auto bg-white shadow-2xl rounded-xl overflow-hidden">
-        <div class="bg-[#000031] text-white p-8 flex justify-between items-center">
-            <div>
-                <h1 class="text-2xl font-bold tracking-tighter text-blue-400">BT GLOBAL SECURITY</h1>
-                <p class="text-sm opacity-70">Automated Threat Intelligence Dashboard v3.0</p>
+<body class="bg-slate-100 min-h-screen p-4 md:p-8">
+    <div class="max-w-5xl mx-auto">
+        <div class="no-print bg-white p-6 rounded-t-xl shadow-sm border-b flex flex-wrap gap-4 items-center justify-between">
+            <div class="flex items-center gap-4">
+                <h1 class="text-xl font-bold text-slate-800">BT Intelligence Archive</h1>
+                <select id="filter-type" class="border rounded px-3 py-1 text-sm bg-gray-50">
+                    <option value="all">所有即時情報</option>
+                    <option value="saved">已收藏歸類 (Saved)</option>
+                </select>
             </div>
-            <div class="no-print">
-                <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-full text-sm font-bold transition">導出 PDF 日報</button>
+            <div class="flex gap-2">
+                <button onclick="fetchNews()" class="bg-slate-800 text-white px-4 py-2 rounded text-sm font-medium hover:bg-slate-700">刷新情報</button>
+                <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-500">導出 PDF</button>
             </div>
         </div>
 
-        <div class="p-8">
-            <div class="flex justify-between items-center mb-6 border-b pb-4">
-                <div class="text-gray-500 text-sm italic">報告生成時間: <span id="date"></span></div>
-                <div id="status" class="text-blue-600 text-xs font-bold animate-pulse">正在同步全球情報...</div>
-            </div>
-
-            <div id="news-list" class="space-y-8">
-                </div>
+        <div id="main-container" class="bg-white p-8 shadow-sm rounded-b-xl space-y-8">
+            <div id="status-msg" class="text-center text-gray-400 py-10">正在初始化系統...</div>
         </div>
-        
-        <footer class="bg-gray-100 p-4 text-center text-[10px] text-gray-400 uppercase tracking-widest">
-            Internal Use Only | Confidential | BT Cyber SOC Division
-        </footer>
     </div>
 
     <script>
-        document.getElementById('date').innerText = new Date().toLocaleString();
+        // 1. 初始化與新聞抓取
+        async function fetchNews() {
+            const container = document.getElementById('main-container');
+            const status = document.getElementById('status-msg');
+            container.innerHTML = '<div class="text-center py-10 animate-pulse text-blue-600">正在獲取全球安全動態...</div>';
 
-        async function init() {
-            const list = document.getElementById('news-list');
-            const status = document.getElementById('status');
-            
             try {
-                // 1. 抓取 RSS 新聞 (使用 rss2json 繞過跨域)
                 const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent('https://www.bleepingcomputer.com/feed/')}`);
                 const data = await res.json();
-                const news = data.items.slice(0, 5); // 抓取前 5 條
-
-                list.innerHTML = '';
-                
-                // 2. 先渲染新聞框架
-                for(let [idx, item] of news.entries()) {
-                    const card = document.createElement('div');
-                    card.className = "report-card border-l-4 border-slate-200 pl-6 py-2";
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <h3 class="text-lg font-extrabold text-slate-800 mb-2">${item.title}</h3>
-                            <span class="text-xs text-gray-400 font-mono">${item.pubDate.split(' ')[0]}</span>
-                        </div>
-                        <p class="text-gray-500 text-sm mb-4 line-clamp-2">${item.description.replace(/<[^>]*>?/gm, '')}</p>
-                        <div id="ai-${idx}" class="bg-blue-50 p-4 rounded-lg border border-blue-100 hidden">
-                            <div class="text-[10px] font-black text-blue-700 mb-2 tracking-widest uppercase">AI Security Insight (Gemini 3)</div>
-                            <div class="text-sm text-slate-700 leading-relaxed ai-content typing">正在進行深度分析...</div>
-                        </div>
-                    `;
-                    list.appendChild(card);
-                }
-
-                status.innerText = "情報同步完成，AI 正在分析中...";
-
-                // 3. 逐條啟動 AI 分析 (避免併發過高，雖然收費版支持，但逐條顯示更有質感)
-                for(let i = 0; i < news.length; i++) {
-                    const aiBox = document.getElementById(`ai-${i}`);
-                    aiBox.classList.remove('hidden');
-                    
-                    try {
-                        const aiRes = await fetch('/api/analyze', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ title: news[i].title })
-                        });
-                        const aiData = await aiRes.json();
-                        aiBox.querySelector('.ai-content').classList.remove('typing');
-                        aiBox.querySelector('.ai-content').innerText = aiData.text || aiData.error;
-                    } catch (e) {
-                        aiBox.querySelector('.ai-content').innerText = "分析超時，請重新整理。";
-                    }
-                }
-                
-                status.innerText = "✅ 全部分析已就緒";
-                status.classList.remove('animate-pulse');
-
-            } catch (err) {
-                status.innerText = "❌ 獲取情報失敗";
-            }
+                renderNews(data.items.slice(0, 6));
+            } catch (e) { container.innerHTML = "數據加載失敗，請檢查網路。"; }
         }
 
-        window.onload = init;
+        // 2. 渲染新聞與 AI 分析框架
+        function renderNews(items) {
+            const container = document.getElementById('main-container');
+            container.innerHTML = items.map((item, idx) => `
+                <div class="report-card border-b pb-8 last:border-0" id="card-${idx}">
+                    <div class="flex justify-between items-start mb-2">
+                        <h2 class="text-xl font-extrabold text-slate-800 hover:text-blue-600 cursor-pointer" id="title-${idx}">${item.title}</h2>
+                        <div class="no-print flex gap-2">
+                            <button onclick="saveArchive(${idx}, 'malware')" class="text-[10px] border px-2 py-1 rounded hover:bg-red-50">📂 歸類:惡意軟體</button>
+                            <button onclick="saveArchive(${idx}, 'identity')" class="text-[10px] border px-2 py-1 rounded hover:bg-yellow-50">📂 歸類:身份認證</button>
+                        </div>
+                    </div>
+                    <p class="text-gray-500 text-sm mb-4">${item.pubDate}</p>
+                    
+                    <div class="bg-slate-50 p-5 rounded-lg border-l-4 border-blue-500" id="ai-container-${idx}">
+                        <div class="text-xs font-bold text-blue-800 mb-2 flex items-center gap-2">
+                            <span>GEMINI 3 PRO ANALYSIS (Bilingual)</span>
+                            <span class="loading-dots animate-ping h-1.5 w-1.5 rounded-full bg-blue-400"></span>
+                        </div>
+                        <div class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed" id="ai-text-${idx}">正在生成中英雙語分析報告...</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // 觸發 AI 分析
+            items.forEach((item, idx) => callAI(item.title, idx));
+        }
+
+        // 3. 呼叫後端 API (中英雙語)
+        async function callAI(title, idx) {
+            const textField = document.getElementById(`ai-text-${idx}`);
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: title })
+                });
+                const data = await response.json();
+                textField.innerText = data.text || data.error;
+                document.querySelector(`#ai-container-${idx} .loading-dots`).remove();
+            } catch (e) { textField.innerText = "分析請求失敗。"; }
+        }
+
+        // 4. 資訊歸類與儲存 (LocalStorage)
+        function saveArchive(idx, cat) {
+            const archiveData = {
+                title: document.getElementById(`title-${idx}`).innerText,
+                content: document.getElementById(`ai-text-${idx}`).innerText,
+                category: cat,
+                time: new Date().toLocaleString()
+            };
+            let current = JSON.parse(localStorage.getItem('bt_soc_archive') || '[]');
+            current.push(archiveData);
+            localStorage.setItem('bt_soc_archive', JSON.stringify(current));
+            alert('已成功存檔並分類！');
+        }
+
+        window.onload = fetchNews;
     </script>
 </body>
 </html>
