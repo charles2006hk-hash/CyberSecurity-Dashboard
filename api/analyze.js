@@ -12,10 +12,11 @@ export default async function handler(req, res) {
             body: JSON.stringify({
                 contents: [{ 
                     parts: [{ 
-                        text: `You are a Senior SOC Lead. Analyze this: "${title}". 
+                        text: `You are a Senior SOC Lead at BT. Analyze this: "${title}". 
                         Return JSON format:
                         {
-                          "risk_score": (0-10 numerical value),
+                          "impact": (1-5 numerical value),
+                          "likelihood": (1-5 numerical value),
                           "analysis_en": "English analysis",
                           "analysis_zh": "中文分析",
                           "action": "Suggested SOC action",
