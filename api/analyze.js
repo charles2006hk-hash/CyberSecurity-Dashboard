@@ -12,26 +12,19 @@ export default async function handler(req, res) {
             body: JSON.stringify({
                 contents: [{ 
                     parts: [{ 
-                        text: `You are a Senior SOC Lead at BT. Analyze this: "${title}". 
-                        Return JSON format:
+                        text: `You are a Senior SOC Lead. Analyze: "${title}". 
+                        Return JSON:
                         {
-                          "impact": (1-5 numerical value),
-                          "likelihood": (1-5 numerical value),
-                          "analysis_en": "English analysis",
-                          "analysis_zh": "中文分析",
-                          "action": "Suggested SOC action",
-                          "category": "Identity/Malware/Infrastructure"
+                          "impact": (1-5), "likelihood": (1-5),
+                          "analysis_en": "English", "analysis_zh": "中文",
+                          "action": "Action", "category": "Identity/Malware/Infra"
                         }` 
                     }] 
                 }],
                 generationConfig: { response_mime_type: "application/json" }
             })
         });
-
         const data = await response.json();
-        const result = JSON.parse(data.candidates[0].content.parts[0].text);
-        res.status(200).json(result);
-    } catch (err) {
-        res.status(500).json({ error: "Analysis failed" });
-    }
+        res.status(200).json(JSON.parse(data.candidates[0].content.parts[0].text));
+    } catch (err) { res.status(500).json({ error: "Fail" }); }
 }
